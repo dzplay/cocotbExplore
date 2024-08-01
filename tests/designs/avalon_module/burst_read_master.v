@@ -369,8 +369,10 @@ module burst_read_master (
     defparam the_master_to_user_fifo.overflow_checking = "OFF";
 
 initial begin
-     $dumpfile("waveform.vcd");
-     $dumpvars(0, burst_read_master);
+     $fsdbDumpfile("sim.fsdb");
+     $fsdbDumpvars();
+    //  $dumpfile("waveform.vcd");
+    //  $dumpvars(0, burst_read_master);
 end
 
 
