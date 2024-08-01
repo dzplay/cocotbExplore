@@ -27,64 +27,33 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-ifneq ($(VHDL_SOURCES),)
+MODULE = test_avalon
+TOPLEVEL_LANG ?= verilog
+COMPILE_ARGS += -l vcs.log
+SIM_ARGS += -l simv.log
+SIM ?= vcs
 
-results.xml:
-	@echo "Skipping simulation as VHDL is not supported on simulator=$(SIM)"
+ifneq ($(TOPLEVEL_LANG),verilog)
+
+all:
+	@echo "Skipping test due to TOPLEVEL_LANG=$(TOPLEVEL_LANG) not being verilog"
 clean::
 
 else
 
-CMD_BIN := vcs
+TOPLEVEL := burst_read_master
 
-ifdef VCS_BIN_DIR
-    CMD := $(shell which $(VCS_BIN_DIR)/$(CMD_BIN) 2>/dev/null)
+ifeq ($(OS),Msys)
+WPWD=$(shell sh -c 'pwd -W')
 else
-    # auto-detect bin dir from system path
-    CMD := $(shell which $(CMD_BIN) 2>/dev/null)
+WPWD=$(shell pwd)
 endif
 
-ifeq (, $(CMD))
-    $(error "Unable to locate command >$(CMD_BIN)<")
-else
-	VCS_BIN_DIR := $(shell dirname $(CMD))
-    export VCS_BIN_DIR
-endif
+COCOTB?=$(WPWD)/../..
 
-ifeq ($(ARCH),x86_64)
-EXTRA_ARGS += -full64
-endif
+VERILOG_SOURCES = $(COCOTB)/tests/designs/avalon_module/burst_read_master.v
 
-# TODO:
-# investigate +vpi+1 option which reduces memory requirements
+include $(COCOTB)/makefiles/Makefile.inc
+include $(COCOTB)/makefiles/Makefile.sim
 
-# Can't do this using an argument, we have to create a PLI table file
-# enabling write access to the design
-$(SIM_BUILD)/pli.tab :
-	echo "acc+=rw,wn:*" > $@
-
-# Compilation phase
-$(SIM_BUILD)/simv: $(SIM_BUILD) $(VERILOG_SOURCES) $(SIM_BUILD)/pli.tab $(COCOTB_LIBS) $(COCOTB_VPI_LIB) $(CUSTOM_COMPILE_DEPS)
-	cd $(SIM_BUILD) && \
-    LD_LIBRARY_PATH=$(LIB_DIR):$(LD_LIBRARY_PATH) TOPLEVEL=$(TOPLEVEL) \
-    $(CMD) $(PLUSARGS) +acc+1 +vpi -P pli.tab +define+COCOTB_SIM=1 -sverilog $(EXTRA_ARGS) -fsdb -debug -load libvpi.so $(COMPILE_ARGS) $(VERILOG_SOURCES)
-
-# Execution phase
-results.xml: $(SIM_BUILD)/simv $(PYTHON_FILES) $(CUSTOM_SIM_DEPS)
-	-PYTHONPATH=$(LIB_DIR):$(SIM_ROOT):$(PWD):$(PYTHONPATH) LD_LIBRARY_PATH=$(LIB_DIR):$(LD_LIBRARY_PATH) MODULE=$(MODULE) TESTCASE=$(TESTCASE) TOPLEVEL=$(TOPLEVEL) \
-		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
-        $(SIM_BUILD)/simv +define+COCOTB_SIM=1 $(SIM_ARGS) $(EXTRA_ARGS)
-
-
-.PHONY: clean
-clean::
-	-@rm -rf $(SIM_BUILD)
-	-@rm -rf simv.log
-	-@rm -rf novas_dump.log
-	-@rm -rf *.pyc
-	-@rm -rf *.fsdb
-	-@rm -rf simv.daidir
-	-@rm -rf cm.log
-	-@rm -rf results.xml
-	-@rm -rf ucli.key
 endif
